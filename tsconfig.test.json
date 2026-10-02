@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "outDir": ".test-build", "noEmit": false },
+  "include": ["api", "lib", "test"]
+}

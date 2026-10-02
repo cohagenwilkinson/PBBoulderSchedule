@@ -1,0 +1,8 @@
+{
+  "functions": {
+    "api/*.ts": { "maxDuration": 300 }
+  },
+  "crons": [
+    { "path": "/api/sync", "schedule": "0 9 * * 0" }
+  ]
+}
