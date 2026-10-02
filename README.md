@@ -4,7 +4,7 @@ Weekly Vercel cron that mirrors the Pure Barre Boulder schedule (today through `
 
 ## Routes
 - `GET /api/sync` - runs the sync. `?dryRun=1` returns the planned diff without writing.
-- `GET /api/probe?mode=source|range|calendar` - build order checks: source reachability, 30-day single request vs 7-day chunks, calendar auth.
+- `GET /api/probe?mode=source|range|calendar|alert|raw` - build order checks: source reachability, 30-day single request vs 7-day chunks, calendar auth, test alert, block diagnostics.
 
 Both require `Authorization: Bearer $CRON_SECRET` (Vercel cron sends this) or `?secret=$CRON_SECRET` for manual runs.
 
@@ -16,6 +16,8 @@ Both require `Authorization: Bearer $CRON_SECRET` (Vercel cron sends this) or `?
 | `PB_LOCATION_SLUG` | `purebarre-boulder-co` |
 | `SYNC_DAYS` | `30` |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | full service account key JSON |
+| `ALERT_WEBHOOK_URL` | optional. Posted on failure. ntfy.sh topic URL or Slack incoming webhook |
+| `HEARTBEAT_URL` | optional. Pinged on success. healthchecks.io check URL catches the cron not running at all |
 
 OAuth fallback if Workspace blocks sharing to the service account: set `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN` instead (scope `https://www.googleapis.com/auth/calendar.events`).
 

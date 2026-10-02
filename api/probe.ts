@@ -2,9 +2,11 @@
 //   source:   one 7-day request, returns the count (confirms Vercel isn't blocked)
 //   range:    one 30-day request vs 7-day chunks, compares id sets
 //   calendar: lists the target calendar to confirm Google auth and sharing
+//   alert:    sends a test failure alert and heartbeat
 import { isAuthorized, json } from "../lib/auth.js";
 import { addDays, fetchChunked, fetchRange } from "../lib/pb.js";
 import { listEvents } from "../lib/gcal.js";
+import { alertFailure, heartbeat } from "../lib/alert.js";
 import { denverDate, denverMidnight } from "../lib/sync.js";
 
 export async function GET(req: Request): Promise<Response> {
@@ -14,6 +16,11 @@ export async function GET(req: Request): Promise<Response> {
   const days = Number(process.env.SYNC_DAYS || 30);
   const today = denverDate(new Date());
   try {
+    if (mode === "alert") {
+      await alertFailure("Pure Barre sync: test alert", "If you can read this, failure alerts work.");
+      await heartbeat();
+      return json({ ok: true, alertConfigured: Boolean(process.env.ALERT_WEBHOOK_URL), heartbeatConfigured: Boolean(process.env.HEARTBEAT_URL) });
+    }
     if (mode === "source") {
       const r = await fetchRange(slug, today, addDays(today, 7));
       const starts = r.entries.map((e) => e.starts_at).sort();

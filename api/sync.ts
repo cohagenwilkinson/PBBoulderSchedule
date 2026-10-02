@@ -1,3 +1,4 @@
+import { alertFailure, heartbeat } from "../lib/alert.js";
 import { isAuthorized, json } from "../lib/auth.js";
 import { runSync } from "../lib/sync.js";
 
@@ -11,10 +12,20 @@ export async function GET(req: Request): Promise<Response> {
       days: Number(process.env.SYNC_DAYS || 30),
       dryRun,
     });
+    if (!dryRun) {
+      if (result.ok) {
+        await heartbeat();
+      } else {
+        const why = result.aborted ?? `${result.counts.failed} write(s) failed: ${result.errors.slice(0, 3).join(" | ")}`;
+        await alertFailure("Pure Barre calendar sync failed", why);
+      }
+    }
     return json(result, result.ok ? 200 : 500);
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     console.error("[pb-sync] fatal:", err);
-    return json({ ok: false, error: err instanceof Error ? err.message : String(err) }, 500);
+    if (!dryRun) await alertFailure("Pure Barre calendar sync failed", message);
+    return json({ ok: false, error: message }, 500);
   }
 }
 
