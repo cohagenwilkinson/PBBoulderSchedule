@@ -19,6 +19,43 @@ export async function GET(req: Request): Promise<Response> {
       const starts = r.entries.map((e) => e.starts_at).sort();
       return json({ ok: true, count: r.entries.length, first: starts[0], last: starts.at(-1), sample: r.entries[0], location: r.location });
     }
+    if (mode === "raw") {
+      // Diagnoses blocking: tries the request with a few header sets and reports status, block headers and page title.
+      const url = `https://members.purebarre.com/api/v2/locations/${slug}/schedule_entries?start_date=${today}&end_date=${addDays(today, 7)}`;
+      const ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36";
+      const base = { accept: "application/json", origin: "https://www.purebarre.com", referer: "https://www.purebarre.com/location/boulder-co", "user-agent": ua };
+      const variants: Record<string, Record<string, string>> = {
+        bare: {},
+        brief: base,
+        fullBrowser: {
+          ...base,
+          accept: "application/json, text/plain, */*",
+          "accept-language": "en-US,en;q=0.9",
+          "sec-ch-ua": '"Chromium";v="129", "Not=A?Brand";v="8", "Google Chrome";v="129"',
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": '"macOS"',
+          "sec-fetch-dest": "empty",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-site",
+        },
+      };
+      const out: Record<string, unknown> = {};
+      for (const [name, headers] of Object.entries(variants)) {
+        const res = await fetch(url, { headers });
+        const text = await res.text();
+        out[name] = {
+          status: res.status,
+          server: res.headers.get("server"),
+          cfRay: res.headers.get("cf-ray"),
+          cfMitigated: res.headers.get("cf-mitigated"),
+          title: text.match(/<title>([^<]*)<\/title>/)?.[1],
+          cfError: text.match(/Error code:?\s*<?[^>]*>?\s*(\d{3,4})/i)?.[1] ?? text.match(/cf-error-code[^>]*>(\d+)/)?.[1],
+          snippet: res.ok ? text.slice(0, 120) : text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 400),
+        };
+      }
+      const ip = await fetch("https://api.ipify.org").then((r) => r.text()).catch(() => "?");
+      return json({ egressIp: ip, region: process.env.VERCEL_REGION, results: out });
+    }
     if (mode === "range") {
       const end = addDays(today, days);
       const single = await fetchRange(slug, today, end).catch((e: Error) => ({ error: e.message, entries: [] as { id: string; starts_at: string }[] }));
