@@ -3,9 +3,10 @@
 //   range:    one 30-day request vs 7-day chunks, compares id sets
 //   calendar: lists the target calendar to confirm Google auth and sharing
 //   alert:    sends a test failure alert and heartbeat
+//   write:    inserts and deletes one test event to confirm write access
 import { isAuthorized, json } from "../lib/auth.js";
 import { addDays, fetchChunked, fetchRange } from "../lib/pb.js";
-import { listEvents } from "../lib/gcal.js";
+import { deleteEvent, insertEvent, listEvents } from "../lib/gcal.js";
 import { alertFailure, heartbeat } from "../lib/alert.js";
 import { denverDate, denverMidnight } from "../lib/sync.js";
 
@@ -85,6 +86,27 @@ export async function GET(req: Request): Promise<Response> {
       const events = await listEvents(calendarId, { timeMin: denverMidnight(today), timeMax: denverMidnight(addDays(today, days + 1)) });
       const managed = events.filter((e) => e.extendedProperties?.private?.pbSource === "pb-sync").length;
       return json({ ok: true, totalEvents: events.length, managedBySync: managed, unmanaged: events.length - managed });
+    }
+    if (mode === "write") {
+      // Inserts one marked test event a year out, then deletes it. Confirms write access.
+      const calendarId = process.env.PB_CALENDAR_ID;
+      if (!calendarId) return json({ ok: false, error: "PB_CALENDAR_ID not set" }, 500);
+      const day = addDays(today, 365);
+      const marker = `probe-${Date.now()}`;
+      await insertEvent(calendarId, {
+        summary: "pb-sync write test (auto-deleted)",
+        start: { date: day },
+        end: { date: addDays(day, 1) },
+        transparency: "transparent",
+        extendedProperties: { private: { pbSource: "pb-sync-probe", pbId: marker } },
+      });
+      const found = await listEvents(calendarId, {
+        timeMin: denverMidnight(day),
+        timeMax: denverMidnight(addDays(day, 1)),
+        privateProperty: `pbId=${marker}`,
+      });
+      for (const ev of found) await deleteEvent(calendarId, ev.id!);
+      return json({ ok: found.length === 1, inserted: true, deleted: found.length });
     }
     return json({ error: `unknown mode ${mode}` }, 400);
   } catch (err) {
