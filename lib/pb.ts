@@ -1,5 +1,7 @@
 // Pure Barre public schedule API client.
 
+import { egressFetch } from "./egress.js";
+
 export interface PbEntry {
   id: string;
   title: string;
@@ -36,7 +38,7 @@ export async function fetchRange(slug: string, startDate: string, endDate: strin
   const url =
     `https://members.purebarre.com/api/v2/locations/${encodeURIComponent(slug)}/schedule_entries` +
     `?start_date=${startDate}&end_date=${endDate}`;
-  const res = await fetch(url, { headers: HEADERS });
+  const res = await egressFetch(url, { headers: HEADERS });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`PB API ${res.status} for ${startDate}..${endDate}: ${body.slice(0, 300)}`);
